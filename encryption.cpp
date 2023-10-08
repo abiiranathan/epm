@@ -67,6 +67,26 @@ std::string PasswordManager::decrypt(const std::string &ciphertext) {
   return plaintext;
 }
 
+std::string PasswordManager::GenerateKey() {
+  // Generate a new secret key
+  unsigned char key[EVP_MAX_KEY_LENGTH];
+  unsigned char iv[EVP_MAX_IV_LENGTH];
+  RAND_bytes(key, EVP_MAX_KEY_LENGTH);
+  RAND_bytes(iv, EVP_MAX_IV_LENGTH);
+
+  std::string keyStr(reinterpret_cast<char *>(key), EVP_MAX_KEY_LENGTH);
+  std::string ivStr(reinterpret_cast<char *>(iv), EVP_MAX_IV_LENGTH);
+
+  std::string keyHex = hexEncode(keyStr);
+  std::string ivHex = hexEncode(ivStr);
+
+  std::string keyB64 = base64Encode(keyHex);
+  std::string ivB64 = base64Encode(ivHex);
+
+  std::string secretKey = keyB64 + ivB64;
+  return secretKey;
+}
+
 void PasswordManager::init_encryption() {
   OpenSSL_add_all_algorithms();
   OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);

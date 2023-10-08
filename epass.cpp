@@ -1,59 +1,62 @@
 #include "epass.h"
+#include "utils.h"
 
-static fs::path getPlatformPath() {
-  fs::path path;
+#define KEY_FILE "epass.key"
 
-  // Check for Windows
-#if defined(_WIN32) || defined(_WIN64)
-  // Get the APPDATA environment variable
-  const char *appdata = std::getenv("APPDATA");
-  if (appdata == nullptr) {
-    std::cout << "Could not get APPDATA environment variable." << std::endl;
-    return "";
-  }
-
-  path = fs::path(appdata) / "epass" / "epass.bin";
-
-// Check for macOS
-#elif defined(__APPLE__)
-  // Get the HOME environment variable
-  const char *home = std::getenv("HOME");
-  if (home == nullptr) {
-    std::cout << "Could not get HOME environment variable." << std::endl;
-    return "";
-  }
-
-  path = fs::path(home) / "Library" / "Application Support" / "epass" /
-         "epass.bin";
-
-// Assume Linux or other POSIX-compliant systems
-#else
-  // Get the HOME environment variable
-  const char *home = std::getenv("HOME");
-  if (home == nullptr) {
-    std::cout << "Could not get HOME environment variable." << std::endl;
-    return "";
-  }
-
-  path = fs::path(home) / ".config" / "epass" / "epass.bin";
-#endif
-
-  return path;
-}
-
-static void makeDirs(const fs::path &path) {
-  fs::path directory = path.parent_path();
-  if (!fs::exists(directory)) {
-    fs::create_directories(directory);
-  }
-}
-
-Epass::Epass(const std::string &secret) : pm(PasswordManager(secret)) {
+Epass::Epass() noexcept {
   path = getPlatformPath();
   makeDirs(path);
+  baseDir = path.parent_path();
+}
+
+bool Epass::KeyExists() { return fs::exists(baseDir / KEY_FILE); }
+
+void Epass::GenerateKey() {
+  std::string secret = pm.GenerateKey();
+  std::cout << "Generated new secret key: " << secret << std::endl;
+
+  // check if the key file already exists
+  if (fs::exists(baseDir / KEY_FILE)) {
+    std::cout << "Key file already exists. Overwrite? [y/N] ";
+    std::string response;
+    std::cin >> response;
+    if (response != "y" && response != "Y") {
+      std::cout << "Aborting." << std::endl;
+      return;
+    }
+  }
+
+  // TODO: save the secret key to a file
+  std::fstream file(baseDir / KEY_FILE, std::ios::out | std::ios::trunc);
+  if (!file.is_open()) {
+    std::cout << "Could not open key file for writing." << std::endl;
+    return;
+  }
+
+  file << secret;
+  std::cout << "Key file written to " << baseDir / KEY_FILE << std::endl;
+  file.close();
 }
 
 void Epass::Load() {
+  if (KeyExists()) {
+    std::fstream file(baseDir / KEY_FILE, std::ios::in);
+    if (!file.is_open()) {
+      std::cout << "Could not open key file for reading." << std::endl;
+      exit(1);
+    }
+
+    std::string secret;
+    file >> secret;
+    pm = PasswordManager(secret);
+    file.close();
+  } else {
+    std::cout << "Secret Key file does not exist. Please run 'epm keygen' to "
+                 "generate a new key."
+              << std::endl;
+    exit(1);
+  }
+
   // Clear existing entries
   entries.clear();
 
@@ -61,6 +64,33 @@ void Epass::Load() {
   std::fstream file(path, std::ios::in | std::ios::binary);
   if (!file.is_open()) {
     std::cout << "Could not open file for reading." << std::endl;
+    return;
+  }
+
+  // if file is empty, return
+  std::uintmax_t fileSize = fs::file_size(path);
+  std::uintmax_t minSize = sizeof(PasswordEntry);
+
+  if (fileSize == 0) {
+    return;
+  }
+
+  if (fileSize < minSize) {
+    // data corrupted
+    std::cout << "data appears to be corrupted. Other operations may fail or "
+                 "return wrong passwords"
+              << std::endl;
+
+    std::cout << "Clean file and start from scratch? [y/n]" << std::endl;
+    std::string answer;
+    std::cin >> answer;
+
+    if (answer == "y" || answer == "Y") {
+      // Set the write position to the beginning of the file
+      file.seekp(0, std::ios::beg);
+      file << "";
+      file.flush();
+    }
     return;
   }
 

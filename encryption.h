@@ -10,6 +10,9 @@
 class PasswordManager {
 public:
   // PasswordManager constructor
+  PasswordManager() = default;
+
+  // PasswordManager constructor
   PasswordManager(const std::string secretKey);
 
   ~PasswordManager();
@@ -19,6 +22,9 @@ public:
 
   // Decrypts the given ciphertext in base64 format and returns the plaintext.
   std::string decrypt(const std::string &b64_cipher);
+
+  // Generate a new secret key
+  std::string GenerateKey();
 
   // Helper functions
   // encode binary data to base64

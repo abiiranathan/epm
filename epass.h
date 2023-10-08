@@ -15,7 +15,9 @@ namespace fs = std::filesystem;
 
 class Epass {
 public:
-  Epass(const std::string &secret);
+  Epass() noexcept;
+  void GenerateKey();
+  bool KeyExists();
   void Load();
   void AddEntry(const std::string &name, const std::string &password);
   void PrintEntry(std::string name);
@@ -25,6 +27,7 @@ public:
 
 private:
   fs::path path;
+  fs::path baseDir;
   std::unordered_map<std::string, PasswordEntry> entries;
   PasswordManager pm;
 
