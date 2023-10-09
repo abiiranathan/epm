@@ -44,4 +44,29 @@ Using make:
 
 Type `./emp help` for more information.
 
+#### Dependencies
+
+- [OpenSSL 3](https://www.openssl.org/)
+- [libsodium](https://doc.libsodium.org/)
+
+Install the dependencies using your package manager.
+
+On Linux:
+
+```bash
+sudo apt install libssl-dev libsodium-dev
+```
+
+On MacOS:
+
+```bash
+brew install openssl libsodium
+```
+
+On Windows:
+
+```bash
+vcpkg install openssl libsodium
+```
+
 Licence: MIT
