@@ -15,7 +15,8 @@ namespace fs = std::filesystem;
 
 class Epass {
 public:
-  Epass() noexcept;
+  // Default constructor.
+  Epass();
   void GenerateKey();
   bool KeyExists();
   void Init();

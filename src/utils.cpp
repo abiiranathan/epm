@@ -48,12 +48,11 @@ fs::path getPlatformPath() {
 void makeDirs(const fs::path &path) {
   fs::path directory = path.parent_path();
   if (!fs::exists(directory)) {
-    fs::create_directories(directory);
-
-    // check for errors
-    if (!fs::exists(directory)) {
-      std::cout << "Could not create directory: " << directory << std::endl;
-      exit(1);
+    std::error_code code;
+    bool success = fs::create_directories(directory, code);
+    if (!success) {
+      throw std::runtime_error("unable to create directory " +
+                               directory.string() + " : " + code.message());
     }
   }
 }

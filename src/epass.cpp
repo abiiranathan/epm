@@ -4,7 +4,7 @@
 
 #define KEY_FILE "epm.key"
 
-Epass::Epass() noexcept {
+Epass::Epass() {
   path = getPlatformPath();
   makeDirs(path);
   baseDir = path.parent_path();

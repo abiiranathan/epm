@@ -12,10 +12,22 @@ To encrypt the passwords, a secret key is used. The key is stored in the system'
 
 Download pre-compiled binaries from the [releases](https://github.com/abiiranathan/epm/releases) or build it yourself.
 
+Using make:
+
 1. Clone the repository.
 2. `cd epm`
 3. `make`
 4. `./emp keygen`
+
+### Using CMake:
+
+1. Clone the repository.
+2. `cd epm`
+3. `mkdir build`
+4. `cd build`
+5. `cmake ..`
+6. `make`
+7. `./emp keygen`
 
 ### Usage
 

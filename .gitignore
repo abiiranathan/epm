@@ -32,3 +32,6 @@
 *.app
 epass
 epm
+obj
+.cache
+build
