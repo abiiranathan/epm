@@ -1,7 +1,8 @@
 #include "epass.h"
+#include "input.h"
 #include "utils.h"
 
-#define KEY_FILE "epass.key"
+#define KEY_FILE "epm.key"
 
 Epass::Epass() noexcept {
   path = getPlatformPath();
@@ -12,9 +13,6 @@ Epass::Epass() noexcept {
 bool Epass::KeyExists() { return fs::exists(baseDir / KEY_FILE); }
 
 void Epass::GenerateKey() {
-  std::string secret = pm.GenerateKey();
-  std::cout << "Generated new secret key: " << secret << std::endl;
-
   // check if the key file already exists
   if (fs::exists(baseDir / KEY_FILE)) {
     std::cout << "Key file already exists. Overwrite? [y/N] ";
@@ -25,6 +23,33 @@ void Epass::GenerateKey() {
       return;
     }
   }
+
+  // Prompt for master password
+  std::string masterPassword;
+  std::string confirmMasterPassword;
+  std::string prompt = "Enter a secret master password: ";
+  char echoChar = '*';
+  masterPassword = requestUserPassword(prompt, echoChar);
+
+  if (masterPassword.empty()) {
+    std::cout << "Password can't be empty" << std::endl;
+    exit(1);
+  }
+
+  if (masterPassword.size() < 8) {
+    std::cout << "Password must be at least 8 characters." << std::endl;
+    exit(1);
+  }
+
+  prompt = "Confirm master password: ";
+  confirmMasterPassword = requestUserPassword(prompt, echoChar);
+  if (masterPassword != confirmMasterPassword) {
+    std::cout << "Passwords do not match." << std::endl;
+    exit(1);
+  }
+
+  std::string secret = pm.GenerateKey(masterPassword);
+  std::cout << "Generated new secret key: " << secret << std::endl;
 
   // TODO: save the secret key to a file
   std::fstream file(baseDir / KEY_FILE, std::ios::out | std::ios::trunc);
@@ -38,11 +63,12 @@ void Epass::GenerateKey() {
   file.close();
 }
 
-void Epass::Load() {
+void Epass::Init() {
   if (KeyExists()) {
     std::fstream file(baseDir / KEY_FILE, std::ios::in);
     if (!file.is_open()) {
-      std::cout << "Could not open key file for reading." << std::endl;
+      std::cout << "Could not open key file for reading. Try again!!"
+                << std::endl;
       exit(1);
     }
 
@@ -50,9 +76,21 @@ void Epass::Load() {
     file >> secret;
     pm = PasswordManager(secret);
     file.close();
+
+    // ask for master password
+    std::string masterPassword;
+    std::string prompt = "Enter master password: ";
+    char echoChar = '*';
+    masterPassword = requestUserPassword(prompt, echoChar);
+
+    // check if the key is valid
+    if (!pm.VerifyKey(secret, masterPassword)) {
+      std::cout << "Invalid master password." << std::endl;
+      exit(1);
+    }
   } else {
     std::cout << "Secret Key file does not exist. Please run 'epm keygen' to "
-                 "generate a new key."
+                 "generate a secret key."
               << std::endl;
     exit(1);
   }

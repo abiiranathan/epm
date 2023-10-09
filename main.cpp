@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
   // Initialise an Epass instance
   Epass epass;
 
-  //   Handle key generation before calling Load.
+  // Handle key generation before calling Load.
   // Load will check for secret key and initialize PasswordManager or fail.
   if (strcmp(argv[1], "keygen") == 0) {
     epass.GenerateKey();
@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   }
 
   // will exit with code 1 if key does not exist
-  epass.Load();
+  epass.Init();
 
   std::string subcommand{argv[1]};
   if (subcommand == "add") {

@@ -18,7 +18,7 @@ public:
   Epass() noexcept;
   void GenerateKey();
   bool KeyExists();
-  void Load();
+  void Init();
   void AddEntry(const std::string &name, const std::string &password);
   void PrintEntry(std::string name);
   void PrintRawEntry(std::string name);

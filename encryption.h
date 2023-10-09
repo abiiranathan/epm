@@ -18,13 +18,18 @@ public:
   ~PasswordManager();
 
   // Encrypts the given plaintext and returns the ciphertext in base64 format.
-  std::string encrypt(const std::string &plaintext);
+  std::string encrypt(const std::string &plaintext,
+                      const std::string *secret = nullptr);
 
   // Decrypts the given ciphertext in base64 format and returns the plaintext.
-  std::string decrypt(const std::string &b64_cipher);
+  std::string decrypt(const std::string &b64_cipher,
+                      const std::string *secret = nullptr);
 
   // Generate a new secret key
-  std::string GenerateKey();
+  std::string GenerateKey(std::string masterPassword);
+
+  bool VerifyKey(const std::string &generatedKey,
+                 const std::string &masterPassword);
 
   // Helper functions
   // encode binary data to base64

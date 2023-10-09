@@ -1,6 +1,6 @@
 #include "utils.h"
 
-#define BASENAME "epass.bin"
+#define BASENAME "epm.bin"
 
 fs::path getPlatformPath() {
   fs::path path;
@@ -15,7 +15,7 @@ fs::path getPlatformPath() {
     return fs::current_path();
   }
 
-  path = fs::path(appdata) / "epass" / BASENAME;
+  path = fs::path(appdata) / "epm" / BASENAME;
 
 // Check for macOS
 #elif defined(__APPLE__)
@@ -27,8 +27,7 @@ fs::path getPlatformPath() {
     return fs::current_path();
   }
 
-  path =
-      fs::path(home) / "Library" / "Application Support" / "epass" / BASENAME;
+  path = fs::path(home) / "Library" / "Application Support" / "epm" / BASENAME;
 
 // Assume Linux or other POSIX-compliant systems
 #else
@@ -40,7 +39,7 @@ fs::path getPlatformPath() {
     return fs::current_path();
   }
 
-  path = fs::path(home) / ".config" / "epass" / BASENAME;
+  path = fs::path(home) / ".config" / "epm" / BASENAME;
 #endif
 
   return path;
@@ -50,5 +49,11 @@ void makeDirs(const fs::path &path) {
   fs::path directory = path.parent_path();
   if (!fs::exists(directory)) {
     fs::create_directories(directory);
+
+    // check for errors
+    if (!fs::exists(directory)) {
+      std::cout << "Could not create directory: " << directory << std::endl;
+      exit(1);
+    }
   }
 }

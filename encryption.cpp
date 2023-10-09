@@ -1,8 +1,17 @@
 #include "encryption.h"
+#include <iomanip>
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rand.h>
+#include <sodium.h>
+#include <vector>
+
+#define EVP_SALT_SIZE 16 // 16 bytes (128 bits)
+#define HEX_RANGE "0123456789ABCDEF"
 
 PasswordManager::PasswordManager(const std::string secretKey) {
   this->secretKey = secretKey;
-  // Initialize OpenSSL library
   init_encryption();
 }
 
@@ -11,11 +20,13 @@ PasswordManager::~PasswordManager() {
   cleanup_encryption();
 }
 
-std::string PasswordManager::encrypt(const std::string &plaintext) {
+std::string PasswordManager::encrypt(const std::string &plaintext,
+                                     const std::string *secret) {
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-  EVP_EncryptInit_ex(
-      ctx, EVP_aes_128_ecb(), NULL,
-      reinterpret_cast<const unsigned char *>(this->secretKey.c_str()), NULL);
+  EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL,
+                     reinterpret_cast<const unsigned char *>(
+                         secret ? secret->c_str() : this->secretKey.c_str()),
+                     NULL);
 
   int ciphertext_len;
   int len;
@@ -40,11 +51,13 @@ std::string PasswordManager::encrypt(const std::string &plaintext) {
   return ciphertext;
 }
 
-std::string PasswordManager::decrypt(const std::string &ciphertext) {
+std::string PasswordManager::decrypt(const std::string &ciphertext,
+                                     const std::string *secret) {
   EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-  EVP_DecryptInit_ex(
-      ctx, EVP_aes_128_ecb(), NULL,
-      reinterpret_cast<const unsigned char *>(this->secretKey.c_str()), NULL);
+  EVP_DecryptInit_ex(ctx, EVP_aes_128_ecb(), NULL,
+                     reinterpret_cast<const unsigned char *>(
+                         secret ? secret->c_str() : this->secretKey.c_str()),
+                     NULL);
 
   int plaintext_len;
   int len;
@@ -67,24 +80,106 @@ std::string PasswordManager::decrypt(const std::string &ciphertext) {
   return plaintext;
 }
 
-std::string PasswordManager::GenerateKey() {
-  // Generate a new secret key
-  unsigned char key[EVP_MAX_KEY_LENGTH];
-  unsigned char iv[EVP_MAX_IV_LENGTH];
-  RAND_bytes(key, EVP_MAX_KEY_LENGTH);
-  RAND_bytes(iv, EVP_MAX_IV_LENGTH);
+std::string PasswordManager::GenerateKey(std::string masterPassword) {
+  if (sodium_init() < 0) {
+    // Panic! The library couldn't be initialized; it's not safe to use.
+    throw std::runtime_error("Sodium initialization failed.");
+  }
 
-  std::string keyStr(reinterpret_cast<char *>(key), EVP_MAX_KEY_LENGTH);
-  std::string ivStr(reinterpret_cast<char *>(iv), EVP_MAX_IV_LENGTH);
+  // Generate a random salt for password-based key derivation
+  std::vector<uint8_t> salt(crypto_pwhash_SALTBYTES);
+  randombytes_buf(salt.data(), salt.size());
 
-  std::string keyHex = hexEncode(keyStr);
-  std::string ivHex = hexEncode(ivStr);
+  // Derive a key from the master password using Argon2
+  std::vector<uint8_t> derivedKey(crypto_secretbox_KEYBYTES);
+  if (crypto_pwhash(derivedKey.data(), derivedKey.size(),
+                    masterPassword.c_str(), masterPassword.length(),
+                    salt.data(), crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                    crypto_pwhash_MEMLIMIT_INTERACTIVE,
+                    crypto_pwhash_ALG_DEFAULT) != 0) {
+    throw std::runtime_error("Key derivation failed.");
+  }
 
-  std::string keyB64 = base64Encode(keyHex);
-  std::string ivB64 = base64Encode(ivHex);
+  // Convert the binary key to a hexadecimal string
+  std::string keyStr;
+  keyStr.reserve(derivedKey.size() * 2);
+  for (size_t i = 0; i < derivedKey.size(); ++i) {
+    keyStr += char(HEX_RANGE[((derivedKey[i] >> 4) & 0xF)]);
+    keyStr += char(HEX_RANGE[(derivedKey[i] & 0xF)]);
+  }
 
-  std::string secretKey = keyB64 + ivB64;
-  return secretKey;
+  // Encode the salt as a hexadecimal string and append it to the key
+  std::string saltStr;
+  saltStr.reserve(salt.size() * 2);
+  for (size_t i = 0; i < salt.size(); ++i) {
+    saltStr += char(HEX_RANGE[((salt[i] >> 4) & 0xF)]);
+    saltStr += char(HEX_RANGE[(salt[i] & 0xF)]);
+  }
+
+  keyStr += saltStr;
+  return keyStr;
+}
+
+bool PasswordManager::VerifyKey(const std::string &generatedKey,
+                                const std::string &masterPassword) {
+  // Check if the generated key has enough characters for the salt
+  if (generatedKey.length() !=
+      (crypto_secretbox_KEYBYTES * 2 + crypto_pwhash_SALTBYTES * 2)) {
+    return false;
+  }
+
+  // Extract the salt from the generated key
+  std::string saltHex = generatedKey.substr(crypto_secretbox_KEYBYTES * 2);
+
+  // Convert the salt from a hexadecimal string to binary
+  std::vector<uint8_t> salt(crypto_pwhash_SALTBYTES);
+  for (size_t i = 0; i < crypto_pwhash_SALTBYTES; ++i) {
+    char highNibble = saltHex[2 * i];
+    char lowNibble = saltHex[2 * i + 1];
+
+    uint8_t highValue = (highNibble >= 'A' && highNibble <= 'F')
+                            ? (highNibble - 'A' + 10)
+                            : (highNibble - '0');
+
+    uint8_t lowValue = (lowNibble >= 'A' && lowNibble <= 'F')
+                           ? (lowNibble - 'A' + 10)
+                           : (lowNibble - '0');
+
+    salt[i] = (highValue << 4) | lowValue;
+  }
+
+  // Extract the key part of the generated key
+  std::string keyHex = generatedKey.substr(0, crypto_secretbox_KEYBYTES * 2);
+
+  // Convert the hexadecimal key string to a binary key
+  std::vector<uint8_t> derivedKey(crypto_secretbox_KEYBYTES);
+  for (size_t i = 0; i < derivedKey.size(); ++i) {
+    char highNibble = keyHex[2 * i];
+    char lowNibble = keyHex[2 * i + 1];
+
+    uint8_t highValue = (highNibble >= 'A' && highNibble <= 'F')
+                            ? (highNibble - 'A' + 10)
+                            : (highNibble - '0');
+
+    uint8_t lowValue = (lowNibble >= 'A' && lowNibble <= 'F')
+                           ? (lowNibble - 'A' + 10)
+                           : (lowNibble - '0');
+
+    derivedKey[i] = (highValue << 4) | lowValue;
+  }
+
+  // Derive a key from the master password using Argon2 with the extracted salt
+  std::vector<uint8_t> verifiedDerivedKey(crypto_secretbox_KEYBYTES);
+  if (crypto_pwhash(verifiedDerivedKey.data(), verifiedDerivedKey.size(),
+                    masterPassword.c_str(), masterPassword.length(),
+                    salt.data(), crypto_pwhash_OPSLIMIT_INTERACTIVE,
+                    crypto_pwhash_MEMLIMIT_INTERACTIVE,
+                    crypto_pwhash_ALG_DEFAULT) != 0) {
+    return false;
+  }
+
+  // Compare the derived key to the verified derived key
+  return derivedKey == verifiedDerivedKey;
 }
 
 void PasswordManager::init_encryption() {
