@@ -82,22 +82,22 @@ static int handleAdd(int argc, char **argv, Epass &epass) {
 
 static void printHelp() {
   // print extended help
-  std::cout << "Usage: epass <subcommand> [arguments]" << std::endl;
+  std::cout << "Usage: epm <subcommand> [arguments]" << std::endl;
   std::cout << "Subcommands: " << std::endl;
   for (auto &subcommand : subcommands) {
     std::cout << "  " << subcommand << std::endl;
 
     if (subcommand == "add") {
       std::cout << "    Add a new entry to the password store." << std::endl;
-      std::cout << "    Usage: epass add <name> <password>" << std::endl;
+      std::cout << "    Usage: epm add <name> <password>" << std::endl;
     } else if (subcommand == "get") {
       std::cout << "    Get an entry from the password store." << std::endl;
-      std::cout << "    Usage: epass get <name>" << std::endl;
+      std::cout << "    Usage: epm get <name>" << std::endl;
     } else if (subcommand == "list") {
       std::cout << "    List all entries in the password store." << std::endl;
     } else if (subcommand == "delete") {
       std::cout << "    Delete an entry from the password store." << std::endl;
-      std::cout << "    Flags: epass delete <name>" << std::endl;
+      std::cout << "    Flags: epm delete <name>" << std::endl;
     } else if (subcommand == "help") {
       std::cout << "    Print this help message." << std::endl;
     } else if (subcommand == "keygen") {
